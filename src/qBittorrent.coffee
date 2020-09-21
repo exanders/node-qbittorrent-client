@@ -12,6 +12,7 @@ class qBittorrent
     @password =  properties['password'] or 'adminadmin'
     @host = properties['host'] or 'localhost'
     @port = properties['port'] or 8080
+    @protocol = properties['protocol'] or 'http'
     @version = properties['version'] or '3.1.8'
     @ssl = properties['ssl'] or false
     @nonce = properties['nonce'] or null
@@ -27,7 +28,7 @@ class qBittorrent
       callback = form
       form = null
 
-    log.debug "#{method} http://#{@host}:#{@port}#{api} #{form or ''}"
+    log.debug "#{method} #{@protocol}://#{@host}:#{@port}#{api} #{form or ''}"
 
     client = this
     async.waterfall [
@@ -41,7 +42,7 @@ class qBittorrent
       (wcb) ->
         options =
           method: method
-          url: "http://#{client.host}:#{client.port}#{api}"
+          url: "#{client.protocol}://#{client.host}:#{client.port}#{api}"
           headers:
             'content-type': 'application/json'
             cookie: client.cookie or null
@@ -94,7 +95,7 @@ class API1 extends qBittorrent
     client = this
     options =
       method: 'GET'
-      url: "http://#{@host}:#{@port}"
+      url: "#{@protocol}://#{@host}:#{@port}"
       headers:
         'content-type': 'application/json'
       json: true
@@ -169,7 +170,7 @@ class API1 extends qBittorrent
 
   deleteTorrentAndData: (hashes, callback) ->
     log.debug 'Executing deleteTorrentAndData'
-    @_makeRequest 'POST', "/command/deletePerm", hashes: hash, callback
+    @_makeRequest 'POST', "/command/deletePerm", hashes: hashes, callback
 
   recheckTorrent: (hash, callback) ->
     log.debug 'Executing recheckTorrent'
@@ -177,19 +178,19 @@ class API1 extends qBittorrent
 
   increaseTorrentPriority: (hashes, callback) ->
     log.debug 'Executing increaseTorrentPriority'
-    @_makeRequest 'POST', "/command/increasePrio", hashes: hash, callback
+    @_makeRequest 'POST', "/command/increasePrio", hashes: hashes, callback
 
   decreaseTorrentPriority: (hashes, callback) ->
     log.debug 'Executing decreaseTorrentPriority'
-    @_makeRequest 'POST', "/command/decreasePrio", hashes: hash, callback
+    @_makeRequest 'POST', "/command/decreasePrio", hashes: hashes, callback
 
   maximalTorrentPriority: (hashes, callback) ->
     log.debug 'Executing maximalTorrentPriority'
-    @_makeRequest 'POST', "/command/topPrio", hashes: hash, callback
+    @_makeRequest 'POST', "/command/topPrio", hashes: hashes, callback
 
   manimalTorrentPriority: (hashes, callback) ->
     log.debug 'Executing manimalTorrentPriority'
-    @_makeRequest 'POST', "/command/bottomPrio", hashes: hash, callback
+    @_makeRequest 'POST', "/command/bottomPrio", hashes: hashes, callback
 
   setFilePriority: (hash, id, priority, callback) ->
     log.debug 'Executing setFilePriority'
@@ -237,7 +238,7 @@ class API2 extends API1
     client = this
     options =
       method: 'POST'
-      url: "http://#{@host}:#{@port}/login"
+      url: "#{@protocol}://#{@host}:#{@port}/login"
       headers:
         'content-type': 'application/x-www-form-urlencoded'
       json: true
@@ -326,7 +327,7 @@ class API2 extends API1
 
   deleteTorrentAndData: (hashes, callback) ->
     log.debug 'Executing deleteTorrentAndData'
-    @_makeRequest 'POST', "/command/deletePerm", hashes: hash, callback
+    @_makeRequest 'POST', "/command/deletePerm", hashes: hashes, callback
 
   recheckTorrent: (hash, callback) ->
     log.debug 'Executing recheckTorrent'
@@ -334,19 +335,19 @@ class API2 extends API1
 
   increaseTorrentPriority: (hashes, callback) ->
     log.debug 'Executing increaseTorrentPriority'
-    @_makeRequest 'POST', "/command/increasePrio", hashes: hash, callback
+    @_makeRequest 'POST', "/command/increasePrio", hashes: hashes, callback
 
   decreaseTorrentPriority: (hashes, callback) ->
     log.debug 'Executing decreaseTorrentPriority'
-    @_makeRequest 'POST', "/command/decreasePrio", hashes: hash, callback
+    @_makeRequest 'POST', "/command/decreasePrio", hashes: hashes, callback
 
   maximalTorrentPriority: (hashes, callback) ->
     log.debug 'Executing maximalTorrentPriority'
-    @_makeRequest 'POST', "/command/topPrio", hashes: hash, callback
+    @_makeRequest 'POST', "/command/topPrio", hashes: hashes, callback
 
   manimalTorrentPriority: (hashes, callback) ->
     log.debug 'Executing manimalTorrentPriority'
-    @_makeRequest 'POST', "/command/bottomPrio", hashes: hash, callback
+    @_makeRequest 'POST', "/command/bottomPrio", hashes: hashes, callback
 
   setFilePriority: (hash, id, priority, callback) ->
     log.debug 'Executing setFilePriority'
@@ -393,8 +394,52 @@ class API3 extends API2
     log.debug 'Executing getTorrentWebSeeds'
     @_makeRequest 'GET', "/query/propertiesWebSeeds/#{hash}", callback
 
+class API4 extends API3
+  login: (cb) ->
+    log.debug 'Authenticating via API4 (Using Cookies)'
+    client = this
+    options =
+      method: 'POST'
+      url: "#{@protocol}://#{@host}:#{@port}/api/v2/auth/login"
+      headers:
+        'content-type': 'application/x-www-form-urlencoded'
+      json: true
+      form:
+        username: @username
+        password: @password
+
+    request options,  (err, res, body) ->
+      if body == 'Ok.' && res.headers['set-cookie']
+        client.authenticated = true
+        client.cookie = res.headers['set-cookie'][0]?.match(/.*; /)[0]?.replace(/; $/,'')
+      return cb err
+
+  getTorrents: (params, callback) ->
+    log.debug 'Executing getTorrents'
+    if typeof params == 'function'
+      callback = params
+      params = null
+    @_makeRequest 'GET', "/api/v2/torrents/info", params, callback
+
+  addTorrentFromURL: (options, callback) ->
+    log.debug 'Executing addTorrentFromURL'
+    @_makeRequest 'POST', "/api/v2/torrents/add", options, callback
+
+  resumeTorrent: (hashes, callback) ->
+    log.debug 'Executing resumeTorrent'
+    @_makeRequest 'GET', "/api/v2/torrents/resume?hashes=#{hashes}", callback
+
+  pauseTorrent: (hashes, callback) ->
+    log.debug 'Executing pauseTorrent'
+    @_makeRequest 'GET', "/api/v2/torrents/pause?hashes=#{hashes}", callback
+
+  deleteTorrentAndData: (hashes, callback) ->
+    log.debug 'Executing deleteTorrentAndData'
+    @_makeRequest 'GET', "/api/v2/torrents/delete?hashes=#{hashes}&deleteFiles=true", callback
+
 module.exports =
   API1: API1
   API2: API2
   API3: API3
+  API4: API4
 
