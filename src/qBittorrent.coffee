@@ -437,6 +437,10 @@ class API4 extends API3
     log.debug 'Executing deleteTorrentAndData'
     @_makeRequest 'GET', "/api/v2/torrents/delete?hashes=#{hashes}&deleteFiles=true", callback
 
+  setCategory: (hashes, category, callback) ->
+    log.debug 'Executing setCategory'
+    @_makeRequest 'GET', "/api/v2/torrents/setCategory?hashes=#{hashes}&category=#{category}", callback
+
 module.exports =
   API1: API1
   API2: API2
